@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOVAR CAPITAL — Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080b0f;
+    --bg2: #0d1117;
+    --bg3: #131920;
+    --border: #1e2a35;
+    --border2: #243040;
+    --text: #c8d8e8;
+    --text2: #6a8090;
+    --text3: #3a5060;
+    --green: #00e57a;
+    --green-dim: #00703c;
+    --red: #ff3b5c;
+    --red-dim: #7a1a2a;
+    --amber: #ffb300;
+    --amber-dim: #7a5500;
+    --blue: #3b9eff;
+    --blue-dim: #1a3a6a;
+    --purple: #a855f7;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .scanline {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 15px; font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--text);
+  }
+  .logo span { color: var(--green); }
+
+  .header-meta {
+    display: flex; align-items: center; gap: 20px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .status-dot.dead { background: var(--red); box-shadow: 0 0 8px var(--red); animation: none; }
+  .status-dot.warn { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .ts { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+  .kill-btn {
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 7px 16px;
+    border: 1px solid var(--red);
+    background: transparent;
+    color: var(--red);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .kill-btn:hover { background: var(--red); color: #fff; }
+  .kill-btn.active { background: var(--red); color: #fff; animation: killPulse 0.8s ease-in-out infinite; }
+  .kill-btn.resume { border-color: var(--green); color: var(--green); }
+  .kill-btn.resume:hover { background: var(--green); color: #000; }
+  @keyframes killPulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,59,92,0.4)} 50%{box-shadow:0 0 0 6px rgba(255,59,92,0)} }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto auto auto;
+    gap: 1px;
+    background: var(--border);
+    min-height: calc(100vh - 53px);
+  }
+
+  .panel {
+    background: var(--bg2);
+    padding: 18px 20px;
+  }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title::after {
+    content: ''; flex: 1;
+    height: 1px; background: var(--border2);
+  }
+
+  .panel-account { grid-column: 1 / 2; grid-row: 1; }
+  .panel-risk    { grid-column: 2 / 3; grid-row: 1; }
+  .panel-agents  { grid-column: 3 / 4; grid-row: 1; }
+  .panel-positions { grid-column: 1 / 3; grid-row: 2; }
+  .panel-audit   { grid-column: 3 / 4; grid-row: 2 / 5; }
+  .panel-agentgrid { grid-column: 1 / 3; grid-row: 3; }
+  .panel-thoughts { grid-column: 1 / 3; grid-row: 4; }
+
+  .metric-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label { color: var(--text2); font-size: 12px; }
+  .metric-value {
+    font-family: var(--mono); font-size: 14px; font-weight: 700;
+    color: var(--text);
+  }
+  .metric-value.pos { color: var(--green); }
+  .metric-value.neg { color: var(--red); }
+  .metric-value.warn { color: var(--amber); }
+
+  .big-metric {
+    text-align: center; padding: 8px 0 12px;
+  }
+  .big-metric .val {
+    font-family: var(--mono); font-size: 28px; font-weight: 700;
+    line-height: 1;
+  }
+  .big-metric .lbl {
+    font-size: 11px; color: var(--text3); margin-top: 4px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+
+  .agent-summary {
+    display: flex; gap: 12px; margin-bottom: 14px;
+  }
+  .agent-count {
+    flex: 1; text-align: center;
+    padding: 10px 6px;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+  }
+  .agent-count .n {
+    font-family: var(--mono); font-size: 22px; font-weight: 700;
+  }
+  .agent-count .l { font-size: 10px; color: var(--text3); margin-top: 2px; }
+  .n.green { color: var(--green); }
+  .n.amber { color: var(--amber); }
+  .n.red   { color: var(--red); }
+  .n.dim   { color: var(--text3); }
+
+  .agent-grid-mini {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .agent-dot {
+    padding: 5px 6px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    display: flex; align-items: center; gap: 5px;
+    cursor: default;
+    transition: border-color 0.2s;
+  }
+  .agent-dot:hover { border-color: var(--border2); color: var(--text2); }
+  .agent-dot .dot {
+    width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot.alive { background: var(--green); box-shadow: 0 0 4px var(--green); }
+  .dot.slow  { background: var(--amber); }
+  .dot.dead  { background: var(--red); }
+  .dot.unknown { background: var(--text3); }
+
+  .risk-kill-banner {
+    display: none;
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--red);
+    letter-spacing: 0.08em;
+    animation: killPulse 0.8s ease-in-out infinite;
+  }
+  .risk-kill-banner.visible { display: block; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text3); text-align: left;
+    padding: 0 8px 8px;
+    border-bottom: 1px solid var(--border2);
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: var(--bg3); }
+  tbody td {
+    padding: 8px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text2);
+  }
+  tbody td.sym { color: var(--text); font-weight: 700; }
+  tbody td.buy { color: var(--green); }
+  tbody td.sell { color: var(--red); }
+  .no-data { color: var(--text3); font-family: var(--mono); font-size: 11px; padding: 16px 0; }
+
+  .audit-feed {
+    display: flex; flex-direction: column; gap: 4px;
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
+  }
+  .audit-entry {
+    padding: 7px 10px;
+    background: var(--bg3);
+    border-left: 2px solid var(--border2);
+    transition: border-color 0.2s;
+    animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn { from { opacity:0; transform: translateX(6px); } to { opacity:1; transform:none; } }
+  .audit-entry:hover { border-left-color: var(--blue); }
+  .audit-entry.KILL_SWITCH { border-left-color: var(--red); }
+  .audit-entry.ORDER_VALIDATED { border-left-color: var(--green); }
+  .audit-entry.ORDER_REJECTED  { border-left-color: var(--red); }
+  .audit-entry.RISK_BREACH     { border-left-color: var(--amber); }
+  .audit-entry.ALERT           { border-left-color: var(--amber); }
+  .audit-row1 {
+    display: flex; gap: 6px; align-items: center; margin-bottom: 2px;
+  }
+  .msg-type {
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    padding: 2px 5px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    letter-spacing: 0.06em;
+  }
+  .msg-type.ORDER_VALIDATED { color: var(--green); border-color: var(--green-dim); }
+  .msg-type.ORDER_REJECTED  { color: var(--red); border-color: var(--red-dim); }
+  .msg-type.RISK_BREACH     { color: var(--amber); border-color: var(--amber-dim); }
+  .msg-type.ALERT           { color: var(--amber); border-color: var(--amber-dim); }
+  .msg-type.KILL_SWITCH     { color: var(--red); border-color: var(--red); }
+  .audit-arrow { color: var(--text3); font-family: var(--mono); font-size: 10px; }
+  .audit-agents { font-family: var(--mono); font-size: 10px; color: var(--text2); }
+  .audit-ts { font-size: 10px; color: var(--text3); margin-left: auto; }
+
+  .agent-dept-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+  }
+  .dept-col {
+    background: var(--bg2);
+    padding: 12px 10px;
+  }
+  .dept-name {
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text3); margin-bottom: 10px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .dept-agents { display: flex; flex-direction: column; gap: 3px; }
+  .dept-agent {
+    display: flex; align-items: center; gap: 5px;
+    font-family: var(--mono); font-size: 9px;
+    color: var(--text3);
+    padding: 3px 0;
+    cursor: default;
+  }
+  .dept-agent:hover { color: var(--text2); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  .flash { animation: flash 0.4s ease; }
+  @keyframes flash { 0%,100%{background:var(--bg2)} 50%{background:var(--bg3)} }
+
+  /* Thinking / reasoning panel */
+  .thoughts-feed {
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 340px; overflow-y: auto;
+  }
+  .thought-entry {
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    padding: 10px 12px;
+    animation: slideIn 0.3s ease;
+    position: relative;
+  }
+  .thought-entry.new { border-color: var(--blue-dim); }
+  .thought-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  }
+  .thought-agent {
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    color: var(--blue); letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .thought-duration {
+    font-family: var(--mono); font-size: 10px; color: var(--text3);
+  }
+  .thought-ts { font-size: 10px; color: var(--text3); margin-left: auto; }
+  .thought-prompt {
+    font-size: 11px; color: var(--text2); margin-bottom: 6px;
+    border-left: 2px solid var(--border2); padding-left: 8px;
+    font-style: italic;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .thought-response {
+    font-size: 12px; color: var(--text); line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .thought-response.expanded { -webkit-line-clamp: unset; }
+  .thought-entry:hover .thought-response { -webkit-line-clamp: unset; }
+
+  /* Thinking indicator on agent dots */
+  .dot.thinking {
+    background: var(--blue);
+    box-shadow: 0 0 6px var(--blue);
+    animation: thinkPulse 0.6s ease-in-out infinite;
+  }
+  @keyframes thinkPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.4)} }
+
+  .thinking-badge {
+    display: inline-block;
+    font-family: var(--mono); font-size: 9px;
+    padding: 1px 5px;
+    background: var(--blue-dim);
+    color: var(--blue);
+    border: 1px solid var(--blue-dim);
+    letter-spacing: 0.06em;
+    animation: thinkPulse 0.8s ease-in-out infinite;
+  }
+
+  .no-thoughts { color: var(--text3); font-family: var(--mono); font-size: 11px; padding: 16px 0; }
+</style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<header>
+  <div class="logo">MOVAR <span>CAPITAL</span> <span style="color:var(--text3);font-weight:400">// COMMAND CENTER</span></div>
+  <div class="header-meta">
+    <div id="conn-dot" class="status-dot dead"></div>
+    <span class="ts" id="last-update">connecting...</span>
+    <button class="kill-btn" id="kill-btn" onclick="toggleKillSwitch()">⚡ KILL SWITCH</button>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- ACCOUNT PANEL -->
+  <div class="panel panel-account">
+    <div class="panel-title">Account</div>
+    <div class="big-metric" style="margin-bottom:8px">
+      <div class="val" id="equity-val">—</div>
+      <div class="lbl">Equity</div>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Balance</span>
+      <span class="metric-value" id="balance-val">—</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Daily P&L</span>
+      <span class="metric-value" id="pnl-val">—</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Open positions</span>
+      <span class="metric-value" id="positions-count">—</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Last sync</span>
+      <span class="metric-value ts" id="account-ts">—</span>
+    </div>
+  </div>
+
+  <!-- RISK PANEL -->
+  <div class="panel panel-risk">
+    <div class="panel-title">Risk Gate</div>
+    <div id="kill-banner" class="risk-kill-banner">⚠ KILL SWITCH ACTIVE — TRADING HALTED</div>
+    <div class="metric-row">
+      <span class="metric-label">Kill switch</span>
+      <span class="metric-value" id="kill-status">—</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Drawdown</span>
+      <span class="metric-value" id="drawdown-val">—</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Daily loss</span>
+      <span class="metric-value" id="daily-loss-val">—</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Validated today</span>
+      <span class="metric-value pos" id="validated-val">—</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Rejected today</span>
+      <span class="metric-value neg" id="rejected-val">—</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Dead letters</span>
+      <span class="metric-value" id="dead-letters">—</span>
+    </div>
+  </div>
+
+  <!-- AGENT STATUS SUMMARY -->
+  <div class="panel panel-agents">
+    <div class="panel-title">Agents (38)</div>
+    <div class="agent-summary">
+      <div class="agent-count">
+        <div class="n green" id="alive-count">0</div>
+        <div class="l">Alive</div>
+      </div>
+      <div class="agent-count">
+        <div class="n amber" id="slow-count">0</div>
+        <div class="l">Slow</div>
+      </div>
+      <div class="agent-count">
+        <div class="n red" id="dead-count">38</div>
+        <div class="l">Dead</div>
+      </div>
+    </div>
+    <div class="agent-grid-mini" id="agent-mini-grid"></div>
+  </div>
+
+  <!-- POSITIONS TABLE -->
+  <div class="panel panel-positions">
+    <div class="panel-title">Open Positions</div>
+    <div id="positions-table-wrap">
+      <div class="no-data">No open positions</div>
+    </div>
+  </div>
+
+  <!-- AUDIT LOG -->
+  <div class="panel panel-audit">
+    <div class="panel-title">Message Bus Feed</div>
+    <div class="audit-feed" id="audit-feed"></div>
+  </div>
+
+  <!-- AGENT DEPARTMENT GRID -->
+  <div class="panel panel-agentgrid" style="padding:0">
+    <div class="agent-dept-grid" id="dept-grid"></div>
+  </div>
+
+  <!-- LIVE REASONING PANEL -->
+  <div class="panel panel-thoughts">
+    <div class="panel-title">
+      Live Agent Reasoning
+      <span id="thinking-banner" style="display:none" class="thinking-badge">THINKING</span>
+    </div>
+    <div class="thoughts-feed" id="thoughts-feed">
+      <div class="no-thoughts">Waiting for agent activity...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const DEPTS = [
+  { name: "Executive", agents: ["ceo","cio","cro","cto","cfo"] },
+  { name: "Portfolio", agents: ["pm_equities","pm_crypto","pm_forex","pm_commodities","pm_derivatives"] },
+  { name: "Research",  agents: ["head_research","quant_analyst","fundamental_analyst","sentiment_analyst","alt_data_analyst"] },
+  { name: "Trading",   agents: ["head_trader","trader_equities","trader_crypto","trader_forex","trader_derivatives"] },
+  { name: "Risk Mgmt", agents: ["market_risk","liquidity_risk","counterparty_risk","drawdown_monitor"] },
+  { name: "Quant",     agents: ["head_quant","stat_arb_trader","hft_developer","ml_engineer","backtest_engineer"] },
+  { name: "Ops + Intel", agents: ["head_operations","trade_ops","compliance","tax_accounting","data_engineer","macro_intelligence","microstructure","competitor_intel","earnings_monitor"] },
+];
+
+const LABEL = {
+  ceo:"CEO", cio:"CIO", cro:"CRO", cto:"CTO", cfo:"CFO",
+  pm_equities:"PM Eq", pm_crypto:"PM Crypto", pm_forex:"PM FX",
+  pm_commodities:"PM Comm", pm_derivatives:"PM Deriv",
+  head_research:"Hd Research", quant_analyst:"Quant",
+  fundamental_analyst:"Fund", sentiment_analyst:"Sentiment",
+  alt_data_analyst:"Alt Data", head_trader:"Hd Trader",
+  trader_equities:"Tr Eq", trader_crypto:"Tr Crypto",
+  trader_forex:"Tr FX", trader_derivatives:"Tr Deriv",
+  market_risk:"Mkt Risk", liquidity_risk:"Liq Risk",
+  counterparty_risk:"Cpty Risk", drawdown_monitor:"DD Monitor",
+  head_quant:"Hd Quant", stat_arb_trader:"StatArb",
+  hft_developer:"HFT Dev", ml_engineer:"ML Eng",
+  backtest_engineer:"Backtest", head_operations:"Hd Ops",
+  trade_ops:"Trade Ops", compliance:"Compliance",
+  tax_accounting:"Tax/Acct", data_engineer:"Data Eng",
+  macro_intelligence:"Macro", microstructure:"Micro",
+  competitor_intel:"Comp Intel", earnings_monitor:"Earnings",
+};
+
+const AGENT_IDS = DEPTS.flatMap(d => d.agents);
+let agentStatuses = {};
+let killActive = false;
+
+function fmt(n, prefix='$') {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return prefix + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function fmtTs(ts) {
+  if (!ts) return '—';
+  const d = new Date(parseFloat(ts) * 1000);
+  return d.toLocaleTimeString('en-US', {hour12:false});
+}
+
+function buildDeptGrid() {
+  const grid = document.getElementById('dept-grid');
+  grid.innerHTML = '';
+  DEPTS.forEach(dept => {
+    const col = document.createElement('div');
+    col.className = 'dept-col';
+    col.innerHTML = `<div class="dept-name">${dept.name}</div><div class="dept-agents" id="dept-${dept.name.replace(/\s+/g,'-')}"></div>`;
+    grid.appendChild(col);
+    const container = col.querySelector('.dept-agents');
+    dept.agents.forEach(id => {
+      const el = document.createElement('div');
+      el.className = 'dept-agent';
+      el.id = `dept-agent-${id}`;
+      el.innerHTML = `<div class="dot unknown" id="dept-dot-${id}"></div><span>${LABEL[id]||id}</span>`;
+      container.appendChild(el);
+    });
+  });
+}
+
+function buildMiniGrid(agents) {
+  const grid = document.getElementById('agent-mini-grid');
+  grid.innerHTML = '';
+  agents.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'agent-dot';
+    el.title = `${a.id}\nStatus: ${a.status}\nLag: ${a.lag_seconds ? a.lag_seconds + 's' : 'n/a'}`;
+    el.innerHTML = `<div class="dot ${a.status}"></div><span>${LABEL[a.id]||a.id}</span>`;
+    grid.appendChild(el);
+  });
+}
+
+function updateAgents(agents) {
+  agents.forEach(a => {
+    agentStatuses[a.id] = a.status;
+    const dot = document.getElementById(`dept-dot-${a.id}`);
+    if (dot) {
+      dot.className = `dot ${a.status}`;
+    }
+  });
+  buildMiniGrid(agents);
+}
+
+function renderAuditEntry(entry) {
+  const el = document.createElement('div');
+  el.className = `audit-entry ${entry.msg_type||''}`;
+  const ts = fmtTs(entry.timestamp);
+  el.innerHTML = `
+    <div class="audit-row1">
+      <span class="msg-type ${entry.msg_type||''}">${entry.msg_type||'MSG'}</span>
+      <span class="audit-agents">${entry.sender} <span class="audit-arrow">→</span> ${entry.recipient}</span>
+      <span class="audit-ts">${ts}</span>
+    </div>`;
+  return el;
+}
+
+function updateAuditFeed(entries) {
+  const feed = document.getElementById('audit-feed');
+  if (!entries || !entries.length) return;
+  const existingIds = new Set([...feed.querySelectorAll('[data-id]')].map(e => e.dataset.id));
+  let added = false;
+  entries.forEach(entry => {
+    if (!existingIds.has(entry.id)) {
+      const el = renderAuditEntry(entry);
+      el.dataset.id = entry.id;
+      feed.insertBefore(el, feed.firstChild);
+      added = true;
+    }
+  });
+  while (feed.children.length > 100) {
+    feed.removeChild(feed.lastChild);
+  }
+}
+
+function updatePositions(positions) {
+  const wrap = document.getElementById('positions-table-wrap');
+  if (!positions || positions.length === 0) {
+    wrap.innerHTML = '<div class="no-data">No open positions</div>';
+    return;
+  }
+  let rows = positions.map(p => {
+    const dir = (p.type === 0 || p.action === 'BUY') ? 'buy' : 'sell';
+    const dirLabel = dir === 'buy' ? 'BUY' : 'SELL';
+    const pnl = p.profit || p.pnl || 0;
+    const pnlClass = pnl >= 0 ? 'pos' : 'neg';
+    return `<tr>
+      <td class="sym">${p.symbol||'—'}</td>
+      <td class="${dir}">${dirLabel}</td>
+      <td>${(p.volume||0).toFixed(2)}</td>
+      <td>${(p.price_open||p.price||0).toFixed(5)}</td>
+      <td>${(p.sl||0).toFixed(5)}</td>
+      <td>${(p.tp||0).toFixed(5)}</td>
+      <td class="${pnlClass}">${fmt(pnl)}</td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<table>
+    <thead><tr><th>Symbol</th><th>Dir</th><th>Vol</th><th>Open</th><th>SL</th><th>TP</th><th>P&L</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function toggleKillSwitch() {
+  const btn = document.getElementById('kill-btn');
+  if (killActive) {
+    await fetch('/api/kill_switch/deactivate', {method:'POST'});
+    btn.textContent = '⚡ KILL SWITCH';
+    btn.classList.remove('active');
+    btn.classList.add('resume');
+  } else {
+    if (!confirm('Activate kill switch? This will halt all trading immediately.')) return;
+    await fetch('/api/kill_switch/activate', {method:'POST'});
+    btn.textContent = '⚡ RESUME TRADING';
+    btn.classList.add('active', 'resume');
+  }
+}
+
+function renderThought(t) {
+  const el = document.createElement('div');
+  el.className = 'thought-entry new';
+  el.dataset.id = t.id || `${t.agent}-${t.ts}`;
+  const ts = fmtTs(t.ts);
+  const durationLabel = t.duration_ms > 0 ? `${(t.duration_ms/1000).toFixed(1)}s` : '';
+  el.innerHTML = `
+    <div class="thought-header">
+      <span class="thought-agent">${t.agent}</span>
+      ${durationLabel ? `<span class="thought-duration">${durationLabel}</span>` : ''}
+      <span class="thought-ts">${ts}</span>
+    </div>
+    <div class="thought-prompt">${escHtml(t.prompt)}</div>
+    <div class="thought-response">${escHtml(t.response)}</div>`;
+  return el;
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function updateThoughts(thoughts) {
+  if (!thoughts || !thoughts.length) return;
+  const feed = document.getElementById('thoughts-feed');
+  const noData = feed.querySelector('.no-thoughts');
+  if (noData) noData.remove();
+
+  const existingIds = new Set([...feed.querySelectorAll('[data-id]')].map(e => e.dataset.id));
+  thoughts.forEach(t => {
+    const id = t.id || `${t.agent}-${t.ts}`;
+    if (!existingIds.has(id)) {
+      const el = renderThought({...t, id});
+      feed.insertBefore(el, feed.firstChild);
+      setTimeout(() => el.classList.remove('new'), 1000);
+    }
+  });
+  while (feed.children.length > 60) feed.removeChild(feed.lastChild);
+}
+
+function updateThinkingIndicators(thinkingAgents) {
+  const set = new Set(thinkingAgents || []);
+  const banner = document.getElementById('thinking-banner');
+  banner.style.display = set.size > 0 ? 'inline-block' : 'none';
+
+  AGENT_IDS.forEach(id => {
+    const dot = document.getElementById(`dept-dot-${id}`);
+    if (!dot) return;
+    if (set.has(id)) {
+      dot.className = 'dot thinking';
+    } else {
+      dot.className = `dot ${agentStatuses[id] || 'unknown'}`;
+    }
+  });
+}
+
+function applySSEUpdate(data) {
+  if (data.error) return;
+
+  killActive = data.kill_switch;
+  const dot = document.getElementById('conn-dot');
+  dot.className = 'status-dot' + (data.kill_switch ? ' warn' : '');
+
+  document.getElementById('last-update').textContent = new Date().toLocaleTimeString('en-US',{hour12:false});
+
+  const banner = document.getElementById('kill-banner');
+  banner.classList.toggle('visible', data.kill_switch);
+  const killBtn = document.getElementById('kill-btn');
+  if (data.kill_switch) {
+    killBtn.textContent = '⚡ RESUME TRADING';
+    killBtn.classList.add('active','resume');
+  } else {
+    killBtn.textContent = '⚡ KILL SWITCH';
+    killBtn.classList.remove('active','resume');
+  }
+
+  const ks = document.getElementById('kill-status');
+  ks.textContent = data.kill_switch ? 'ACTIVE' : 'INACTIVE';
+  ks.className = 'metric-value ' + (data.kill_switch ? 'neg' : 'pos');
+
+  const ac = data.agent_counts || {};
+  document.getElementById('alive-count').textContent = ac.alive ?? 0;
+  document.getElementById('slow-count').textContent = ac.slow ?? 0;
+  document.getElementById('dead-count').textContent = ac.dead ?? 0;
+
+  if (data.recent_messages) {
+    data.recent_messages.forEach(m => {
+      const feed = document.getElementById('audit-feed');
+      const el = renderAuditEntry(m);
+      el.dataset.id = `sse-${m.timestamp}-${m.sender}-${m.recipient}`;
+      if (!feed.querySelector(`[data-id="${el.dataset.id}"]`)) {
+        feed.insertBefore(el, feed.firstChild);
+        while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+      }
+    });
+  }
+
+  if (data.thinking_agents !== undefined) updateThinkingIndicators(data.thinking_agents);
+  if (data.latest_thoughts) updateThoughts(data.latest_thoughts);
+
+  if (data.account && data.account.balance) {
+    const acc = data.account;
+    const eq = parseFloat(acc.equity||0);
+    const pnl = parseFloat(acc.daily_pnl||0);
+    document.getElementById('equity-val').textContent = fmt(eq);
+    document.getElementById('equity-val').className = 'val ' + (eq > 0 ? '' : 'neg');
+    document.getElementById('balance-val').textContent = fmt(parseFloat(acc.balance||0));
+    document.getElementById('pnl-val').textContent = fmt(pnl);
+    document.getElementById('pnl-val').className = 'metric-value ' + (pnl >= 0 ? 'pos' : 'neg');
+    document.getElementById('positions-count').textContent = acc.open_positions ?? '—';
+    document.getElementById('account-ts').textContent = fmtTs(acc.timestamp);
+  }
+}
+
+async function fullRefresh() {
+  try {
+    const [agents, audit, positions, risk, thoughts, thinking] = await Promise.all([
+      fetch('/api/agents').then(r=>r.json()),
+      fetch('/api/audit?limit=60').then(r=>r.json()),
+      fetch('/api/positions').then(r=>r.json()),
+      fetch('/api/risk').then(r=>r.json()),
+      fetch('/api/thoughts?limit=30').then(r=>r.json()),
+      fetch('/api/thinking').then(r=>r.json()),
+    ]);
+
+    updateAgents(agents);
+    updateAuditFeed(audit);
+    updatePositions(positions);
+    updateThoughts(thoughts);
+    updateThinkingIndicators(thinking);
+
+    document.getElementById('drawdown-val').textContent = (risk.current_drawdown_pct||0).toFixed(2) + '%';
+    document.getElementById('drawdown-val').className = 'metric-value ' + (risk.current_drawdown_pct > 3 ? 'neg' : 'pos');
+    document.getElementById('daily-loss-val').textContent = fmt(risk.daily_loss_usd || 0);
+    document.getElementById('validated-val').textContent = risk.orders_validated_today ?? 0;
+    document.getElementById('rejected-val').textContent = risk.orders_rejected_today ?? 0;
+    document.getElementById('dead-letters').textContent = risk.dead_letter_count ?? 0;
+  } catch(e) {
+    document.getElementById('conn-dot').className = 'status-dot dead';
+    document.getElementById('last-update').textContent = 'connection error';
+  }
+}
+
+function startSSE() {
+  const es = new EventSource('/api/stream');
+  es.onmessage = e => {
+    try { applySSEUpdate(JSON.parse(e.data)); } catch(err) {}
+  };
+  es.onerror = () => {
+    document.getElementById('conn-dot').className = 'status-dot dead';
+    setTimeout(startSSE, 3000);
+    es.close();
+  };
+}
+
+buildDeptGrid();
+fullRefresh();
+setInterval(fullRefresh, 10000);
+startSSE();
+</script>
+</body>
+</html>
