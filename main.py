@@ -1,6 +1,7 @@
 import asyncio
 import os
 import signal
+import sys
 import time
 from pathlib import Path
 from dotenv import load_dotenv
@@ -180,8 +181,13 @@ class MOVAR:
 async def main():
     firm = MOVAR()
     loop = asyncio.get_running_loop()
-    loop.add_signal_handler(signal.SIGINT, firm.shutdown)
-    loop.add_signal_handler(signal.SIGTERM, firm.shutdown)
+    if sys.platform != "win32":
+        loop.add_signal_handler(signal.SIGINT, firm.shutdown)
+        loop.add_signal_handler(signal.SIGTERM, firm.shutdown)
+    else:
+        # Windows doesn't support add_signal_handler — use signal.signal instead
+        signal.signal(signal.SIGINT, lambda *_: firm.shutdown())
+        signal.signal(signal.SIGTERM, lambda *_: firm.shutdown())
     await firm.boot()
 
 
