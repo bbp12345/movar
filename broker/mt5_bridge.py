@@ -62,13 +62,18 @@ class MT5Bridge:
         return result
 
     def _connect_sync(self) -> bool:
-        if not mt5.initialize(
-            login=int(os.getenv("MT5_LOGIN", 0)),
-            password=os.getenv("MT5_PASSWORD", ""),
-            server=os.getenv("MT5_SERVER", "FusionMarkets-Demo"),
-        ):
-            print(f"[BROKER] MT5 init failed: {mt5.last_error()}")
-            return False
+        # Connect to the already-running terminal without passing credentials.
+        # MT5 reuses the active session; passing login/password to a running
+        # terminal causes error -6 (authorization failed).
+        terminal_path = os.getenv("MT5_PATH")
+        if terminal_path:
+            if not mt5.initialize(terminal_path):
+                print(f"[BROKER] MT5 init failed: {mt5.last_error()}")
+                return False
+        else:
+            if not mt5.initialize():
+                print(f"[BROKER] MT5 init failed: {mt5.last_error()}")
+                return False
         print("[BROKER] MT5 connected to Fusion Markets")
         return True
 
